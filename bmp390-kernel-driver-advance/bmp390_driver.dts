@@ -1,0 +1,72 @@
+/dts-v1/;
+/plugin/;
+
+/*
+ * Device tree overlay for BMP390 pressure and temperature sensor
+ * Supports I2C and SPI interfaces on Raspberry Pi platforms
+ * Compatible with BCM2835 and BCM2711
+ *
+ * Properties:
+ *   - operation-mode: "default", "periodic", or "async"
+ *   - fifo-watermark: FIFO watermark level (1-255)
+ *   - output-data-rate: Output data rate (0-7, corresponding to 0.78Hz to 100Hz)
+ */
+
+/ {
+    compatible = "brcm,bcm2835", "brcm,bcm2711";
+
+    fragment@0 {
+        target = <&i2c1>;
+        __overlay__ {
+            #address-cells = <1>;
+            #size-cells = <0>;
+            status = "okay";
+
+            bmp390@76 {
+                compatible = "bosch,bmp390";
+                reg = <0x76>;
+                interrupt-parent = <&gpio>;
+                interrupts = <17 1>; /* GPIO17, rising edge */
+                vdd-supply = <&vdd_3v3>;
+                operation-mode = "periodic";
+                fifo-watermark = <1>;
+                output-data-rate = <5>; /* 25 Hz */
+                shared-memory-size = <0x1000>;
+            };
+
+            bmp390@77 {
+                compatible = "bosch,bmp390";
+                reg = <0x77>;
+                interrupt-parent = <&gpio>;
+                interrupts = <18 1>; /* GPIO18, rising edge */
+                vdd-supply = <&vdd_3v3>;
+                operation-mode = "async";
+                fifo-watermark = <1>;
+                output-data-rate = <5>; /* 25 Hz */
+                shared-memory-size = <0x1000>;
+            };
+        };
+    };
+
+    fragment@1 {
+        target = <&spi0>;
+        __overlay__ {
+            #address-cells = <1>;
+            #size-cells = <0>;
+            status = "okay";
+
+            bmp390@0 {
+                compatible = "bosch,bmp390";
+                reg = <0>;
+                spi-max-frequency = <1000000>;
+                interrupt-parent = <&gpio>;
+                interrupts = <17 1>; /* GPIO17, rising edge */
+                vdd-supply = <&vdd_3v3>;
+                operation-mode = "periodic";
+                fifo-watermark = <1>;
+                output-data-rate = <5>; /* 25 Hz */
+                shared-memory-size = <0x1000>;
+            };
+        };
+    };
+};
