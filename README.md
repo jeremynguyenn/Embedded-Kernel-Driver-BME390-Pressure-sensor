@@ -1,4 +1,4 @@
-# BMP390 Kernel Driver
+# BMP390 Kernel Driver - Pressure sensor BMP390
 
 This is a Linux kernel driver for the **Bosch BMP390** pressure and temperature sensor, integrated with the Industrial I/O (IIO) subsystem. The driver supports both I2C and SPI interfaces, offering full compatibility with the Bosch BMP390 datasheet and feature parity with the user-space LibDriver implementation. It provides robust functionality for temperature and pressure measurement, calibration, oversampling, output data rate (ODR), IIR filtering, FIFO, interrupt handling, and power management, making it suitable for production-grade embedded systems.
 
