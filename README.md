@@ -301,10 +301,6 @@ sudo cp bmp390_driver.dtbo /boot/overlays/
   - Enhance runtime PM with finer-grained power states.
   - Support additional Bosch sensors (e.g., BMP580).
 
-## License
-- **Kernel Driver**: GPL v2
-- **User-Space Test Program**: MIT License
-
 ## Acknowledgments
 - Based on Bosch BMP390 datasheet and LibDriver user-space code.
 - Inspired by Linux kernel `bmp280` driver and community patches (2023–2025).
