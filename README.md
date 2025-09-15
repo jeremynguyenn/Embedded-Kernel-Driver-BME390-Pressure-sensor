@@ -302,6 +302,5 @@ sudo cp bmp390_driver.dtbo /boot/overlays/
   - Support additional Bosch sensors (e.g., BMP580).
 
 ## Acknowledgments
-- Based on Bosch BMP390 datasheet and LibDriver user-space code.
 - Inspired by Linux kernel `bmp280` driver and community patches (2023–2025).
 - Thanks to the Linux kernel community for IIO subsystem documentation and driver examples.
