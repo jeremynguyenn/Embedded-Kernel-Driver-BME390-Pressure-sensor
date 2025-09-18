@@ -89,6 +89,7 @@ The driver is organized into modular components for clarity and maintainability:
 - **Dependencies**: IIO subsystem enabled in the kernel (`CONFIG_IIO`).
 
 ### Step-by-Step Installation
+## OPTION 1:
 1. **Clone the Repository** (if hosted):
    ```bash
    git clone <repository_url>
@@ -159,9 +160,149 @@ The driver is organized into modular components for clarity and maintainability:
 - **Device Tree Issues**: Verify `bmp390_driver.dtbo` is in `/boot/overlays` and `dtoverlay=bmp390_driver` is in `/boot/config.txt`.
 - **Interrupt Issues**: Confirm GPIO pin connections and Device Tree interrupt settings.
 
+## OPTION 2:
+### Step 1: Enable I2C or SPI
+- Enable the desired interface:
+  - Run `sudo raspi-config`, navigate to *Interfacing Options*, and enable *I2C* and/or *SPI*.
+  - Alternatively, ensure `dtparam=i2c_arm=on` or `dtparam=spi=on` in `/boot/config.txt`.
+- Reboot the Pi:
+  ```
+  sudo reboot
+  ```
+
+### Step 2: Prepare Device Tree Overlay
+The `bmp390_driver.dts` file is a device tree overlay that enables the BMP390 sensor. Compile and apply it as follows:
+
+- Navigate to the repository directory containing the source files.
+- Compile the device tree source to a device tree blob overlay:
+  ```
+  make dtb
+  ```
+  This generates `bmp390_driver.dtbo`.
+
+- Copy the overlay to the Raspberry Pi's overlay directory:
+  ```
+  sudo cp bmp390_driver.dtbo /boot/overlays/
+  ```
+
+- Edit `/boot/config.txt` to apply the overlay:
+  ```
+  sudo nano /boot/config.txt
+  ```
+  Add the following line at the end:
+  ```
+  dtoverlay=bmp390_driver
+  ```
+  - For I2C, ensure `dtparam=i2c_arm=on` is present.
+  - For SPI, ensure `dtparam=spi=on` is present.
+
+- Reboot to apply the overlay:
+  ```
+  sudo reboot
+  ```
+
+**Advanced (Optional)**: If the overlay does not work or you need to modify the base device tree:
+- Navigate to `/boot`.
+- Decompile the base DTB to DTS for your Pi model (e.g., for Raspberry Pi 4, use `bcm2711-rpi-4-b.dtb`):
+  ```
+  dtc -I dtb -O dts -o temp.dts bcm2711-rpi-4-b.dtb
+  ```
+- Edit `temp.dts` with a text editor:
+  - Find the `i2c1` or `spi0` node.
+  - Add the BMP390 node from `bmp390_driver.dts` (e.g., `bmp390@76` for I2C or `bmp390@0` for SPI).
+- Recompile the DTS back to DTB:
+  ```
+  dtc -I dts -O dtb -o bcm2711-rpi-4-b.dtb temp.dts
+  ```
+- Reboot:
+  ```
+  sudo reboot
+  ```
+
+### Step 3: Build the Driver and Test Program
+- Install kernel headers if not already present:
+  ```
+  sudo apt update
+  sudo apt install raspberrypi-kernel-headers
+  ```
+- Ensure `KERNEL_DIR` in the Makefile points to your kernel source (default: `/lib/modules/$(uname -r)/build`).
+- Build all artifacts (modules, overlay, and test program):
+  ```
+  make all
+  ```
+  This generates:
+  - Kernel modules: `bmp390.ko`, `bmp390_core.ko`, `bmp390_iio.ko`, `bmp390_i2c.ko`, `bmp390_spi.ko`.
+  - Device tree overlay: `bmp390_driver.dtbo`.
+  - Test program: `bmp390_test`.
+
+- To build specific components:
+  - Kernel modules only: `make modules`
+  - Device tree overlay only: `make dtb`
+  - Test program only: `make bmp390_test`
+
+- To clean build artifacts (keep source and generated artifacts):
+  ```
+  make clean
+  ```
+- To clean all generated files (including artifacts):
+  ```
+  make cleanall
+  ```
+- To generate documentation (requires kernel-doc):
+  ```
+  make doc
+  ```
+  This creates `bmp390_doc.rst`.
+
+### Step 4: Install the Driver
+- Install the kernel modules:
+  ```
+  sudo make install
+  ```
+  This installs modules to `/usr/lib/modules`, copies the DTBO to `/boot/overlays`, and runs `depmod -a`.
+
+- Alternatively, manually load the modules:
+  ```
+  sudo insmod bmp390_core.ko
+  sudo insmod bmp390_iio.ko
+  sudo insmod bmp390_i2c.ko  # For I2C interface
+  sudo insmod bmp390_spi.ko  # For SPI interface
+  sudo insmod bmp390.ko      # Main module
+  ```
+
+- Verify installation:
+  ```
+  dmesg | grep BMP390
+  lsmod | grep bmp390
+  ```
+  Look for messages like "BMP390 driver registered" or module names in `lsmod`.
+
+- The driver exposes:
+  - Misc device: `/dev/bmp390`
+  - IIO device: `/sys/bus/iio/devices/iio:device0/`
+
+### Step 5: Run the Test Program
+The `bmp390_test.c` program demonstrates reading temperature/pressure, setting modes, and using ioctls.
+
+- Run the test program (default: 3 readings, 1000ms interval):
+  ```
+  ./bmp390_test
+  ```
+- Specify custom number of readings and interval (e.g., 5 readings, 500ms interval):
+  ```
+  ./bmp390_test 5 500
+  ```
+- Example output includes:
+  - Temperature and pressure (raw and processed).
+  - Calibration parameters.
+  - Tests for periodic and async modes.
+  - FIFO flush confirmation.
+
+
 ## Usage
 ### 1. Reading Sensor Data
 - **Via Sysfs**:
+- Access sensor data and configure settings via sysfs:
   Read processed temperature and pressure:
   ```bash
   cat /sys/bus/iio/devices/iio:device0/in_temp_input
@@ -172,12 +313,25 @@ The driver is organized into modular components for clarity and maintainability:
   Temperature: 23.450000 C
   Pressure: 101325.000000 Pa
   ```
+- Read raw values:
   Read raw data:
   ```bash
   cat /sys/bus/iio/devices/iio:device0/in_temp_raw
   cat /sys/bus/iio/devices/iio:device0/in_pressure_raw
   ```
-
+- Set pressure oversampling (e.g., x16):
+  ```
+  echo 16 > /sys/bus/iio/devices/iio:device0/in_pressure_oversampling_ratio
+  ```
+- Set sampling frequency (e.g., 25 Hz):
+  ```
+  echo 25 > /sys/bus/iio/devices/iio:device0/sampling_frequency
+  ```
+- Set FIFO watermark:
+  ```
+  echo 1 > /sys/bus/iio/devices/iio:device0/buffer/watermark
+  ```
+  
 - **Via Device File**:
   Read raw buffer data (requires buffer enabled):
   ```bash
@@ -281,6 +435,41 @@ sudo cp bmp390_driver.dtbo /boot/overlays/
   ```bash
   cat /proc/interrupts | grep bmp390
   ```
+## Uninstallation
+- Remove the kernel modules:
+  ```
+  sudo rmmod bmp390 bmp390_spi bmp390_i2c bmp390_iio bmp390_core
+  ```
+- Remove the device tree overlay:
+  ```
+  sudo dtoverlay -r bmp390_driver
+  ```
+- Reboot to ensure clean removal:
+  ```
+  sudo reboot
+  ```
+- Clean all generated files:
+  ```
+  make cleanall
+  ```
+
+## Troubleshooting
+- **No device detected**:
+  - Check `dmesg` for errors (e.g., "Invalid chip ID").
+  - Verify hardware connections:
+    - I2C: Run `i2cdetect -y 1` to check for addresses 0x76/0x77.
+    - SPI: Ensure proper wiring and chip select.
+  - Confirm power supply (3.3V via `vdd-supply` in DTS).
+- **Build errors**:
+  - Ensure kernel headers match the running kernel: `uname -r`.
+  - Install headers: `sudo apt install raspberrypi-kernel-headers`.
+- **Module loading fails**:
+  - Check module dependencies: `depmod -a`.
+  - If signed modules are required, set `SIGN_KEY` in Makefile.
+- **Test program errors**:
+  - Ensure `/dev/bmp390` exists and modules are loaded.
+  - Check permissions: `sudo chmod +rw /dev/bmp390`.
+
 
 ## Advanced Features
 - **Periodic Mode**: Kernel thread (`bmp390_kthread_fn`) collects data at configured ODR, storing in shared memory for user-space access.
